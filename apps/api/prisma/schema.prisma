@@ -1,0 +1,105 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id         String   @id @default(uuid())
+  name       String
+  plan       String   @default("free")
+  status     String   @default("active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  users      User[]
+  assets     Asset[]
+  tags       Tag[]
+  templates  Template[]
+  evaluations Evaluation[]
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String?
+  name       String?
+  role       String   @default("user")
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Asset {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  ownerId     String
+  name        String
+  description String?
+  type        String   @default("custom")
+  status      String   @default("draft")
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tags        AssetTag[]
+  evaluations Evaluation[]
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  type      String?
+  createdAt DateTime @default(now())
+  assets    AssetTag[]
+}
+
+model AssetTag {
+  id      String @id @default(uuid())
+  assetId String
+  asset   Asset  @relation(fields: [assetId], references: [id])
+  tagId   String
+  tag     Tag    @relation(fields: [tagId], references: [id])
+
+  @@unique([assetId, tagId])
+}
+
+model Template {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  assetType   String
+  dimensions  Json
+  ownerScope  String   @default("tenant")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  evaluations Evaluation[]
+}
+
+model Evaluation {
+  id          String   @id @default(uuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  assetId     String
+  asset       Asset    @relation(fields: [assetId], references: [id])
+  templateId  String
+  template    Template @relation(fields: [templateId], references: [id])
+  status      String   @default("draft")
+  method      String   @default("manual")
+  progress    Int      @default(0)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

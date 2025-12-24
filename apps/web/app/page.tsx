@@ -1,147 +1,92 @@
-import type { Link } from '@repo/api';
-import { Button } from '@repo/ui/button';
-import Image, { type ImageProps } from 'next/image';
+import { 
+  BarChart3, 
+  ClipboardList, 
+  FileText, 
+  TrendingUp,
+  ArrowUpRight,
+  Plus
+} from 'lucide-react';
 
-import styles from './page.module.css';
+const stats = [
+  { name: 'Total Assets', value: '12', icon: BarChart3, change: '+2', changeType: 'positive' },
+  { name: 'Active Evaluations', value: '4', icon: ClipboardList, change: '+1', changeType: 'positive' },
+  { name: 'Reports Generated', value: '28', icon: FileText, change: '+5', changeType: 'positive' },
+  { name: 'Avg. Rating', value: '8.4', icon: TrendingUp, change: '+0.2', changeType: 'positive' },
+];
 
-type Props = Omit<ImageProps, 'src'> & {
-  srcLight: string;
-  srcDark: string;
-};
-
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
-
+export default function Home() {
   return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">Welcome back, John</h2>
+        <p className="text-muted-foreground">
+          Here is what's happening with your assets today.
+        </p>
+      </div>
 
-async function getLinks(): Promise<Link[]> {
-  try {
-    const res = await fetch('http://localhost:3000/links', {
-      cache: 'no-store',
-    });
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat) => (
+          <div key={stat.name} className="p-6 bg-card border rounded-xl shadow-sm">
+            <div className="flex items-center justify-between">
+              <stat.icon className="h-5 w-5 text-muted-foreground" />
+              <span className={stat.changeType === 'positive' ? 'text-green-600 text-xs font-medium flex items-center' : 'text-red-600 text-xs font-medium flex items-center'}>
+                {stat.change}
+                <ArrowUpRight className="ml-1 h-3 w-3" />
+              </span>
+            </div>
+            <div className="mt-4">
+              <p className="text-sm font-medium text-muted-foreground">{stat.name}</p>
+              <h3 className="text-2xl font-bold">{stat.value}</h3>
+            </div>
+          </div>
+        ))}
+      </div>
 
-    if (!res.ok) {
-      throw new Error('Failed to fetch links');
-    }
-
-    return res.json();
-  } catch (error) {
-    console.error('Error fetching links:', error);
-    return [];
-  }
-}
-
-export default async function Home() {
-  const links = await getLinks();
-
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.com/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-
-        {links.length > 0 ? (
-          <div className={styles.ctas}>
-            {links.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={link.description}
-                className={styles.secondary}
-              >
-                {link.title}
-              </a>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="p-6 bg-card border rounded-xl shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Recent Assets</h3>
+            <button className="text-xs font-medium text-primary hover:underline flex items-center">
+              View all
+            </button>
+          </div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
+                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Enterprise Cloud Service {i}</p>
+                    <p className="text-xs text-muted-foreground">Updated 2h ago</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">
+                    Active
+                  </span>
+                </div>
+              </div>
             ))}
           </div>
-        ) : (
-          <div style={{ color: '#666' }}>
-            No links available. Make sure the NestJS API is running on port
-            3000.
-          </div>
-        )}
-      </main>
+        </div>
 
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.com?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.com →
-        </a>
-      </footer>
+        <div className="p-6 bg-card border rounded-xl shadow-sm flex flex-col items-center justify-center text-center space-y-4">
+          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <Plus className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold">New Evaluation</h3>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+              Start a new evaluation for your digital or physical assets.
+            </p>
+          </div>
+          <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+            Start Now
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
