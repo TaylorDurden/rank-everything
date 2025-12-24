@@ -19,7 +19,7 @@ export class LinksService {
     },
     {
       id: 2,
-      title: 'Add Repositories',
+      title: 'Add Repositories1',
       url: 'https://turborepo.com/docs/getting-started/add-to-existing-repository',
       description:
         'Turborepo can be incrementally adopted in any repository, single or multi-package, to speed up the developer and CI workflows of the repository.',
