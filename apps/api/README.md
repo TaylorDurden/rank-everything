@@ -9,9 +9,15 @@ pnpm run dev
 # Also works with NPM, YARN, BUN, ...
 ```
 
-By default, your server will run at [localhost:3000](http://localhost:3000). You can use your favorite API platform like [Insomnia](https://insomnia.rest/) or [Postman](https://www.postman.com/) to test your APIs
+By default, your server will run at [localhost:3000](http://localhost:3000).
 
-You can start editing the demo **APIs** by modifying [linksService](./src/links/links.service.ts) provider.
+## 💡 API Documentation (Swagger)
+
+This project uses Swagger for API documentation. Once the server is running, you can access the interactive API documentation at:
+
+- **Swagger UI**: [http://localhost:3000/api](http://localhost:3000/api)
+
+You can use the Swagger UI to explore and test the available endpoints directly from your browser. Alternatively, you can use your favorite API platform like [Insomnia](https://insomnia.rest/) or [Postman](https://www.postman.com/).
 
 ### Important Note 🚧
 

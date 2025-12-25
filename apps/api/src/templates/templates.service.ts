@@ -33,4 +33,21 @@ export class TemplatesService {
       where: { id },
     });
   }
+
+  async update(id: string, dto: any) {
+    const { dimensions, ...data } = dto;
+    return this.prisma.template.update({
+      where: { id },
+      data: {
+        ...data,
+        dimensions: dimensions !== undefined ? (dimensions as any) : undefined,
+      },
+    });
+  }
+
+  async remove(id: string) {
+    return this.prisma.template.delete({
+      where: { id },
+    });
+  }
 }

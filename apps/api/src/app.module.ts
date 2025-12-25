@@ -8,8 +8,11 @@ import { TemplatesModule } from './templates/templates.module';
 import { EvaluationsModule } from './evaluations/evaluations.module';
 import { AiModule } from './ai/ai.module';
 import { ReportsModule } from './reports/reports.module';
+import { AuthModule } from './auth/auth.module';
 import { AppService } from './app.service';
 import { AppController } from './app.controller';
+import { APP_GUARD } from '@nestjs/core';
+import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
   imports: [
@@ -22,8 +25,15 @@ import { AppController } from './app.controller';
     EvaluationsModule,
     AiModule,
     ReportsModule,
+    AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
+    },
+  ],
 })
 export class AppModule {}

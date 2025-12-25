@@ -1,6 +1,7 @@
 export interface AiAnalysisRequestDto {
   assetId: string;
   templateId: string;
+  evaluationId?: string;
   context?: string;
 }
 

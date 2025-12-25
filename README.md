@@ -23,6 +23,13 @@ pnpm dev
 
 - 前端: `http://localhost:3001`
 - 后端: `http://localhost:3000`
+- **API 文档 (Swagger)**: `http://localhost:3000/api`
+
+## 💡 API 文档
+
+本项目使用 Swagger 自动生成 API 文档。后端服务启动后，你可以通过以下链接进行在线调试和查看接口说明：
+
+- **Swagger UI**: [http://localhost:3000/api](http://localhost:3000/api)
 
 ## 🏗️ 核心架构
 

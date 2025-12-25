@@ -33,8 +33,10 @@ export class ReportsService {
       evaluationId,
       assetName: evaluation.asset.name,
       templateName: evaluation.template.name,
-      score: 85, // Mock score
-      content: 'Detailed report content...',
+      status: evaluation.status,
+      results: (evaluation as any).results || null,
+      score: ((evaluation as any).results as any)?.scores?.security || 0,
+      content: ((evaluation as any).results as any)?.reportMarkdown || 'Analysis pending visualization...',
     };
   }
 }

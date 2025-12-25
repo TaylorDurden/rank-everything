@@ -1,22 +1,29 @@
-import { Controller, Get, Post, Body, Param, Patch, Delete, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Delete, Headers, UseGuards } from '@nestjs/common';
+import { GetUser } from '../auth/decorators/user.decorator';
+import { ApiTags, ApiHeader, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AssetsService } from './assets.service';
 import { CreateAssetDto, UpdateAssetDto } from '@repo/api';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+@ApiTags('assets')
+@ApiBearerAuth()
+@ApiHeader({ name: 'x-tenant-id', required: true })
+@UseGuards(JwtAuthGuard)
 @Controller('assets')
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
   @Post()
   create(
-    @Headers('x-tenant-id') tenantId: string,
-    @Headers('x-user-id') userId: string,
+    @GetUser('tenantId') tenantId: string,
+    @GetUser('id') userId: string,
     @Body() createAssetDto: CreateAssetDto,
   ) {
     return this.assetsService.create(tenantId, userId, createAssetDto);
   }
 
   @Get()
-  findAll(@Headers('x-tenant-id') tenantId: string) {
+  findAll(@GetUser('tenantId') tenantId: string) {
     return this.assetsService.findAll(tenantId);
   }
 

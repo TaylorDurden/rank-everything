@@ -20,4 +20,11 @@ export class TenantsService {
       where: { id },
     });
   }
+
+  async update(id: string, name: string) {
+    return this.prisma.tenant.update({
+      where: { id },
+      data: { name },
+    });
+  }
 }

@@ -14,6 +14,34 @@ export class AiService {
       throw new Error('Asset or Template not found');
     }
 
+    if (dto.evaluationId) {
+      await this.prisma.evaluation.update({
+        where: { id: dto.evaluationId },
+        data: { 
+          status: 'completed', 
+          progress: 100,
+          results: {
+            scores: {
+              'security': 85,
+              'compliance': 90,
+              'performance': 78,
+            },
+            rationales: {
+              'security': 'The asset follows standard security protocols but lacks multi-factor authentication details.',
+              'compliance': 'Fully compliant with GDPR based on provided metadata.',
+              'performance': 'Performance metrics indicate occasional latency during peak hours.',
+            },
+            suggestions: [
+              'Implement multi-factor authentication for higher security score.',
+              'Optimize database queries to reduce latency.',
+              'Regularly audit compliance logs.'
+            ],
+            reportMarkdown: `# AI Analysis Report for ${asset.name}\n\n## Overview\nThis report provides an automated scoring and rationale for the asset based on the ${template.name} template.\n\n## Score Breakdown\n- Security: 85/100\n- Compliance: 90/100\n- Performance: 78/100\n\n## Key Suggestions\n1. Implement MFA.\n2. Optimize queries.`
+          } as any
+        },
+      });
+    }
+
     // Mock AI Analysis for now
     // In a real implementation, we would call OpenAI/Gemini here
     
