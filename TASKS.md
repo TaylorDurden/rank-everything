@@ -49,11 +49,11 @@
     - [x] Applied shadcn/ui components to Assets, Evaluations (list & detail), Templates (list & detail), Settings, and Reports pages.
 
 ## Phase 6: Enterprise AI & Reporting (Future Roadmap)
-- [ ] Replace mock AI with real LLM (OpenAI GPT-4 / Gemini)
+- [x] Replace mock AI with real LLM (Deepseek)
 - [ ] Implement Prompt Versioning & Management
-- [ ] Support for Data Ingestion (File uploads, URL scraping)
-- [ ] Real PDF generation for evaluation reports
-- [ ] Email/Slack Notification system
+- [x] Support for Data Ingestion (File uploads, URL scraping)
+- [x] Real PDF generation for evaluation reports
+- [x] Email/Slack Notification system
 
 ---
-*Status: Initial MVP & Premium UI Integration Completed*
+*Status: Phase 6 Core Features Completed (except Prompt Versioning)*

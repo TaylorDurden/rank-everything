@@ -10,7 +10,10 @@ import {
   FileCheck,
   ClipboardList,
   Sparkles,
-  Zap
+  Zap,
+  Upload,
+  Link as LinkIcon,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '../../../lib/api';
@@ -34,6 +37,8 @@ export default function NewEvaluationWizard() {
     templateId: '',
     assetId: '',
   });
+  const [importMode, setImportMode] = useState<'select' | 'upload' | 'scrape'>('select');
+  const [scrapeUrl, setScrapeUrl] = useState('');
 
   const { data: templates = [] } = useQuery({
     queryKey: ['templates'],
@@ -52,10 +57,7 @@ export default function NewEvaluationWizard() {
     }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['evaluations'] });
-      // The API returns the created evaluation, so we can redirect to it.
-      // However, apiFetch type might not infer this well without a generic.
-      // We'll rely on listing page for now or need to type the mutation response.
-      // Actually let's assume the API returns the object.
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
       if (data && (data as any).id) {
           router.push(`/evaluations/${(data as any).id}`);
       } else {
@@ -65,6 +67,62 @@ export default function NewEvaluationWizard() {
     onError: (err: any) => {
       toast.error(`Failed to create evaluation: ${err.message}`);
     }
+  });
+
+  const uploadFile = useMutation({
+    mutationFn: async (file: File) => {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : '';
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${API_URL}/assets/upload`, {
+        method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+        throw new Error(error.message || 'Upload failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      if (data.assets && data.assets.length > 0) {
+        setSelection({ ...selection, assetId: data.assets[0].id });
+        setImportMode('select');
+        toast.success(`Successfully imported ${data.assets.length} asset(s)`);
+      }
+    },
+    onError: (err: any) => {
+      toast.error(`Upload failed: ${err.message}`);
+    },
+  });
+
+  const scrapeUrlMutation = useMutation({
+    mutationFn: (url: string) => apiFetch('/assets/scrape', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      if (data.asset) {
+        setSelection({ ...selection, assetId: data.asset.id });
+        setImportMode('select');
+        toast.success('Successfully scraped URL and created asset');
+      }
+    },
+    onError: (err: any) => {
+      toast.error(`Scraping failed: ${err.message}`);
+    },
   });
 
   const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
@@ -179,37 +237,175 @@ export default function NewEvaluationWizard() {
                 <p className="text-slate-500">Pick the asset you want to synchronize with the selected framework.</p>
               </div>
             </div>
-            
-            <div className="grid gap-4">
-              {assets.map((asset: any) => (
-                <div 
-                  key={asset.id} 
-                  onClick={() => setSelection({ ...selection, assetId: asset.id })}
-                  className={clsx(
-                    "p-5 border-2 rounded-2xl cursor-pointer transition-all flex items-center justify-between",
-                    selection.assetId === asset.id 
-                      ? "border-purple-500 bg-purple-500/5" 
-                      : "border-white/5 bg-white/5 hover:border-white/10"
-                  )}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center">
-                      <Target className={clsx("w-5 h-5", selection.assetId === asset.id ? "text-purple-400" : "text-slate-500")} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-white">{asset.name}</p>
-                      <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">{asset.type}</p>
-                    </div>
-                  </div>
-                  <div className={clsx(
-                    "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
-                    selection.assetId === asset.id ? "border-purple-500" : "border-slate-700"
-                  )}>
-                    {selection.assetId === asset.id && <div className="h-3 w-3 rounded-full bg-purple-500 animate-in zoom-in" />}
-                  </div>
-                </div>
-              ))}
+
+            {/* Import Mode Tabs */}
+            <div className="flex gap-2 border-b border-white/5">
+              <button
+                onClick={() => setImportMode('select')}
+                className={clsx(
+                  "px-6 py-3 font-bold text-sm transition-all border-b-2",
+                  importMode === 'select'
+                    ? "text-purple-400 border-purple-400"
+                    : "text-slate-500 border-transparent hover:text-white"
+                )}
+              >
+                Select Existing
+              </button>
+              <button
+                onClick={() => setImportMode('upload')}
+                className={clsx(
+                  "px-6 py-3 font-bold text-sm transition-all border-b-2",
+                  importMode === 'upload'
+                    ? "text-purple-400 border-purple-400"
+                    : "text-slate-500 border-transparent hover:text-white"
+                )}
+              >
+                Upload File
+              </button>
+              <button
+                onClick={() => setImportMode('scrape')}
+                className={clsx(
+                  "px-6 py-3 font-bold text-sm transition-all border-b-2",
+                  importMode === 'scrape'
+                    ? "text-purple-400 border-purple-400"
+                    : "text-slate-500 border-transparent hover:text-white"
+                )}
+              >
+                Scrape URL
+              </button>
             </div>
+
+            {importMode === 'select' && (
+              <div className="grid gap-4">
+                {assets.length === 0 ? (
+                  <div className="text-center py-12 text-slate-500">
+                    <Target className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No assets found. Create one or import from file/URL.</p>
+                  </div>
+                ) : (
+                  assets.map((asset: any) => (
+                    <div 
+                      key={asset.id} 
+                      onClick={() => setSelection({ ...selection, assetId: asset.id })}
+                      className={clsx(
+                        "p-5 border-2 rounded-2xl cursor-pointer transition-all flex items-center justify-between",
+                        selection.assetId === asset.id 
+                          ? "border-purple-500 bg-purple-500/5" 
+                          : "border-white/5 bg-white/5 hover:border-white/10"
+                      )}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center">
+                          <Target className={clsx("w-5 h-5", selection.assetId === asset.id ? "text-purple-400" : "text-slate-500")} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-white">{asset.name}</p>
+                          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black">{asset.type}</p>
+                        </div>
+                      </div>
+                      <div className={clsx(
+                        "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
+                        selection.assetId === asset.id ? "border-purple-500" : "border-slate-700"
+                      )}>
+                        {selection.assetId === asset.id && <div className="h-3 w-3 rounded-full bg-purple-500 animate-in zoom-in" />}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {importMode === 'upload' && (
+              <div className="space-y-6">
+                <div className="border-2 border-dashed border-white/10 rounded-2xl p-12 text-center">
+                  <Upload className="w-12 h-12 mx-auto mb-4 text-slate-500" />
+                  <p className="text-white font-bold mb-2">Upload CSV or JSON File</p>
+                  <p className="text-sm text-slate-500 mb-6">Supported formats: CSV, JSON (max 10MB)</p>
+                  <input
+                    type="file"
+                    accept=".csv,.json"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        uploadFile.mutate(file);
+                      }
+                    }}
+                    className="hidden"
+                    id="file-upload"
+                    disabled={uploadFile.isPending}
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    className={clsx(
+                      "inline-block px-6 py-3 rounded-xl font-bold cursor-pointer transition-all",
+                      uploadFile.isPending
+                        ? "bg-slate-700 text-slate-400 cursor-not-allowed"
+                        : "bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20"
+                    )}
+                  >
+                    {uploadFile.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 inline-block mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 inline-block mr-2" />
+                        Choose File
+                      </>
+                    )}
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {importMode === 'scrape' && (
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <label className="block text-sm font-bold text-white">
+                    URL to Scrape
+                  </label>
+                  <div className="flex gap-3">
+                    <input
+                      type="url"
+                      value={scrapeUrl}
+                      onChange={(e) => setScrapeUrl(e.target.value)}
+                      placeholder="https://example.com"
+                      className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:border-purple-500"
+                    />
+                    <button
+                      onClick={() => {
+                        if (scrapeUrl) {
+                          scrapeUrlMutation.mutate(scrapeUrl);
+                        }
+                      }}
+                      disabled={!scrapeUrl || scrapeUrlMutation.isPending}
+                      className={clsx(
+                        "px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2",
+                        scrapeUrlMutation.isPending || !scrapeUrl
+                          ? "bg-slate-700 text-slate-400 cursor-not-allowed"
+                          : "bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20"
+                      )}
+                    >
+                      {scrapeUrlMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Scraping...
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="w-4 h-4" />
+                          Scrape
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    We'll extract metadata, Open Graph tags, and structured data from the URL.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

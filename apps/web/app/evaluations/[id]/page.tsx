@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Zap,
   BarChart3,
-  Loader2
+  Loader2,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
@@ -92,6 +93,43 @@ export default function EvaluationDetailsPage() {
     downloadAnchorNode.remove();
   };
 
+  const downloadPdf = useMutation({
+    mutationFn: async () => {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const tenantId = typeof window !== 'undefined' ? localStorage.getItem('tenantId') : '';
+
+      const response = await fetch(`${API_URL}/reports/${id}/pdf`, {
+        method: 'GET',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Failed to generate PDF' }));
+        throw new Error(error.message || 'Failed to generate PDF');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report_${evaluation?.asset?.name || id}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    },
+    onSuccess: () => {
+      toast.success('PDF report downloaded successfully');
+    },
+    onError: (err: any) => {
+      toast.error(`Failed to download PDF: ${err.message}`);
+    },
+  });
+
   return (
     <div className="space-y-10 animate-in fade-in duration-1000">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -113,6 +151,25 @@ export default function EvaluationDetailsPage() {
           </p>
         </div>
         <div className="flex gap-4">
+          {evaluation.status === 'completed' && (
+            <button 
+              onClick={() => downloadPdf.mutate()}
+              disabled={downloadPdf.isPending}
+              className="px-6 py-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-400 font-bold hover:text-blue-300 hover:bg-blue-500/20 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {downloadPdf.isPending ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5" />
+                  Download PDF
+                </>
+              )}
+            </button>
+          )}
           <button 
             onClick={handleExport}
             className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-slate-300 font-bold hover:text-white transition-all flex items-center gap-2"

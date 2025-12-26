@@ -2,6 +2,34 @@
 
 ## Getting Started
 
+### Environment Variables
+
+Create a `.env` file in the `apps/api` directory with the following variables:
+
+```env
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/rank_everything?schema=public"
+
+# JWT
+JWT_SECRET="your-secret-key-change-in-production"
+
+# Deepseek AI API (Optional - will fallback to mock if not configured)
+DEEPSEEK_API_KEY="your-deepseek-api-key"
+DEEPSEEK_API_URL="https://api.deepseek.com/v1/chat/completions"
+
+# Notifications (Optional)
+SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+EMAIL_ENABLED=false
+
+# Frontend URL (for notification links)
+FRONTEND_URL="http://localhost:3001"
+
+# PDF Output Directory (Optional)
+PDF_OUTPUT_DIR="./storage/pdfs"
+```
+
+### Running the Server
+
 First, run the development server:
 
 ```bash
