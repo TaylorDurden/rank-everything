@@ -42,9 +42,15 @@ export class ReportsService {
 
     const results = (evaluation as any).results || null;
     const scores = results?.scores || {};
-    const overallScore = results?.overall_score || 
-      (Object.values(scores).length > 0 
-        ? Math.round(Object.values(scores).reduce((a: number, b: number) => a + b, 0) / Object.values(scores).length)
+
+    const scoreValues = Object.values(scores as Record<string, number>).filter(
+      (v): v is number => typeof v === 'number',
+    );
+
+    const overallScore =
+      results?.overall_score ||
+      (scoreValues.length > 0
+        ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
         : 0);
 
     return {
@@ -76,9 +82,15 @@ export class ReportsService {
 
     const results = (evaluation as any).results || {};
     const scores = results.scores || {};
-    const overallScore = results.overall_score || 
-      (Object.values(scores).length > 0 
-        ? Math.round(Object.values(scores).reduce((a: number, b: number) => a + b, 0) / Object.values(scores).length)
+
+    const scoreValues = Object.values(scores as Record<string, number>).filter(
+      (v): v is number => typeof v === 'number',
+    );
+
+    const overallScore =
+      results.overall_score ||
+      (scoreValues.length > 0
+        ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
         : 0);
 
     // Extract findings and risks from results if available
@@ -122,7 +134,7 @@ export class ReportsService {
           reportUrl: `${this.configService.get('FRONTEND_URL') || 'http://localhost:3001'}/evaluations/${evaluationId}`,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to send notification: ${error.message}`);
     }
 

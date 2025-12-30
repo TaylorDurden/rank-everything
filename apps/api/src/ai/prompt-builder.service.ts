@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { PromptsService } from '../prompts/prompts.service';
 
 export interface AssetContext {
   id: string;
@@ -29,10 +30,26 @@ export interface EvaluationContext {
 
 @Injectable()
 export class PromptBuilderService {
+  constructor(private promptsService: PromptsService) {}
+
   /**
-   * 根据专家角色获取系统提示词
+   * 根据专家角色获取系统提示词（从数据库或默认）
    */
-  private getExpertRolePrompt(assetType: string): string {
+  private async getExpertRolePrompt(tenantId: string, assetType: string, expertRole?: string): Promise<string> {
+    // Try to get from database first
+    const dbPrompt = await this.promptsService.getActivePrompt(tenantId, assetType, expertRole);
+    if (dbPrompt) {
+      return dbPrompt;
+    }
+
+    // Fallback to default prompts
+    return this.getDefaultExpertRolePrompt(assetType);
+  }
+
+  /**
+   * 根据专家角色获取默认系统提示词
+   */
+  private getDefaultExpertRolePrompt(assetType: string): string {
     const expertRoles: Record<string, string> = {
       website: `你是一位网站体验专家，专注于：
 - 信息架构和导航设计
@@ -72,12 +89,13 @@ export class PromptBuilderService {
   /**
    * 构建系统提示词
    */
-  buildSystemPrompt(
+  async buildSystemPrompt(
+    tenantId: string,
     asset: AssetContext,
     template: TemplateContext,
     evaluation?: EvaluationContext,
-  ): string {
-    const expertRole = this.getExpertRolePrompt(asset.type || template.assetType);
+  ): Promise<string> {
+    const expertRole = await this.getExpertRolePrompt(tenantId, asset.type || template.assetType);
     
     const dimensionsText = template.dimensions
       .map((dim, index) => {
@@ -160,4 +178,5 @@ ${dimensionsText}
     return `请对以下资产进行评估：${metadataText}`;
   }
 }
+
 

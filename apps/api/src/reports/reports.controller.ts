@@ -32,13 +32,13 @@ export class ReportsController {
   ) {
     try {
       const { filePath, filename } = await this.reportsService.generatePdfReport(evaluationId);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
-      
+
       const fileBuffer = await fs.readFile(filePath);
       res.send(fileBuffer);
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         `Failed to generate PDF: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -55,13 +55,13 @@ export class ReportsController {
     try {
       // First generate if not exists
       const { filePath, filename } = await this.reportsService.generatePdfReport(evaluationId);
-      
+
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}.pdf"`);
-      
+
       const fileBuffer = await fs.readFile(filePath);
       res.send(fileBuffer);
-    } catch (error) {
+    } catch (error: any) {
       throw new HttpException(
         `Failed to download PDF: ${error.message}`,
         HttpStatus.INTERNAL_SERVER_ERROR,

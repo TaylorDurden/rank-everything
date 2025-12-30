@@ -18,7 +18,7 @@ export class DataIngestionService {
   /**
    * Parse CSV file content
    */
-  async parseCsv(fileContent: Buffer, encoding = 'utf-8'): Promise<ParsedData[]> {
+  async parseCsv(fileContent: Buffer, encoding: BufferEncoding = 'utf8'): Promise<ParsedData[]> {
     try {
       const text = fileContent.toString(encoding);
       const records = parse(text, {
@@ -34,7 +34,7 @@ export class DataIngestionService {
         metadata: this.extractMetadata(record),
         dimensions: this.extractDimensions(record),
       }));
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to parse CSV: ${error.message}`);
       throw new BadRequestException(`Invalid CSV format: ${error.message}`);
     }
@@ -43,7 +43,7 @@ export class DataIngestionService {
   /**
    * Parse JSON file content
    */
-  async parseJson(fileContent: Buffer, encoding = 'utf-8'): Promise<ParsedData | ParsedData[]> {
+  async parseJson(fileContent: Buffer, encoding: BufferEncoding = 'utf8'): Promise<ParsedData | ParsedData[]> {
     try {
       const text = fileContent.toString(encoding);
       const data = JSON.parse(text);
@@ -55,7 +55,7 @@ export class DataIngestionService {
 
       // Handle single asset
       return this.normalizeJsonData(data);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to parse JSON: ${error.message}`);
       throw new BadRequestException(`Invalid JSON format: ${error.message}`);
     }
@@ -125,7 +125,7 @@ export class DataIngestionService {
         type: this.inferAssetType(url, ogType, structuredData),
         metadata,
       };
-    } catch (error) {
+    } catch (error: any) {
       if (axios.isAxiosError(error)) {
         this.logger.error(`Failed to scrape URL: ${error.message}`);
         throw new BadRequestException(`Failed to scrape URL: ${error.message}`);
@@ -247,4 +247,5 @@ export class DataIngestionService {
     return cleaned;
   }
 }
+
 

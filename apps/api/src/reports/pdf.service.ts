@@ -18,7 +18,7 @@ export class PdfService {
   private async ensureOutputDir() {
     try {
       await fs.mkdir(this.outputDir, { recursive: true });
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to create output directory: ${error.message}`);
     }
   }
@@ -54,7 +54,7 @@ export class PdfService {
       this.logger.log(`PDF generated: ${filePath}`);
 
       return filePath;
-    } catch (error) {
+    } catch (error: any) {
       if (browser) {
         await browser.close();
       }
@@ -366,9 +366,10 @@ export class PdfService {
     try {
       await fs.unlink(filePath);
       this.logger.log(`PDF deleted: ${filePath}`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`Failed to delete PDF: ${error.message}`);
     }
   }
 }
+
 

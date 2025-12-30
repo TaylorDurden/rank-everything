@@ -33,16 +33,20 @@ export class NotificationsService {
 
     // Send email if enabled
     if (this.emailEnabled) {
-      promises.push(this.sendEmail(payload).catch((err) => {
-        this.logger.error(`Email notification failed: ${err.message}`);
-      }));
+      promises.push(
+        this.sendEmail(payload).catch((err: any) => {
+          this.logger.error(`Email notification failed: ${err.message}`);
+        }),
+      );
     }
 
     // Send Slack if configured
     if (this.slackWebhookUrl) {
-      promises.push(this.sendSlack(payload).catch((err) => {
-        this.logger.error(`Slack notification failed: ${err.message}`);
-      }));
+      promises.push(
+        this.sendSlack(payload).catch((err: any) => {
+          this.logger.error(`Slack notification failed: ${err.message}`);
+        }),
+      );
     }
 
     await Promise.allSettled(promises);
@@ -84,7 +88,7 @@ export class NotificationsService {
         },
       });
       this.logger.log(`Slack notification sent for ${payload.type}`);
-    } catch (error) {
+    } catch (error: any) {
       if (axios.isAxiosError(error)) {
         throw new Error(`Slack API error: ${error.message}`);
       }
@@ -268,4 +272,5 @@ export class NotificationsService {
     `;
   }
 }
+
 

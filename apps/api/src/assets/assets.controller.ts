@@ -93,7 +93,7 @@ export class AssetsController {
   async uploadFile(
     @GetUser('tenantId') tenantId: string,
     @GetUser('id') userId: string,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');

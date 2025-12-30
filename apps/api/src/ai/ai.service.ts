@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AiAnalysisRequestDto, AiAnalysisResponseDto } from '@repo/api';
 import { PromptBuilderService } from './prompt-builder.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ApiUsageService } from './api-usage.service';
 
 interface DeepseekResponse {
   choices: Array<{
@@ -49,6 +50,7 @@ export class AiService {
     private configService: ConfigService,
     private promptBuilder: PromptBuilderService,
     private notificationsService: NotificationsService,
+    private apiUsageService: ApiUsageService,
   ) {
     this.apiKey = this.configService.get<string>('DEEPSEEK_API_KEY') || '';
     this.apiUrl = this.configService.get<string>('DEEPSEEK_API_URL') || 'https://api.deepseek.com/v1/chat/completions';
@@ -78,19 +80,54 @@ export class AiService {
 
     let analysisResult: AiAnalysisResponseDto;
 
-    try {
-      // Try to call Deepseek API
-      if (this.apiKey) {
-        analysisResult = await this.callDeepseekAPI(asset, template, evaluation);
-        this.logger.log(`Successfully analyzed asset ${asset.id} using Deepseek API`);
-      } else {
-        this.logger.warn('DEEPSEEK_API_KEY not configured, falling back to mock analysis');
+    // Check cache first
+    const metadataHash = this.apiUsageService.generateMetadataHash(asset.metadata);
+    const cachedResult = this.apiUsageService.getCachedResult(asset.id, template.id, metadataHash);
+    
+    if (cachedResult) {
+      this.logger.log(`Using cached result for asset ${asset.id}`);
+      analysisResult = cachedResult;
+    } else {
+      // Check rate limits
+      const canCall = await this.apiUsageService.canMakeApiCall(asset.tenantId);
+      
+      if (!canCall.allowed) {
+        this.logger.warn(`API call blocked for tenant ${asset.tenantId}: ${canCall.reason}`);
+        // Return fallback instead of throwing error
         analysisResult = this.getFallbackAnalysis(asset, template);
+      } else {
+        try {
+          // Try to call Deepseek API
+          if (this.apiKey) {
+            const result = await this.callDeepseekAPI(asset, template, evaluation);
+
+            // tokenUsage 是内部字段，不在公共 DTO 上暴露，这里通过 any 读取
+            const tokenUsage = (result as any).tokenUsage as number | undefined;
+
+            // Record usage
+            await this.apiUsageService.recordApiUsage(asset.tenantId, tokenUsage);
+
+            // Cache the result
+            this.apiUsageService.setCachedResult(
+              asset.id,
+              template.id,
+              result,
+              tokenUsage,
+              metadataHash,
+            );
+
+            analysisResult = result;
+            this.logger.log(`Successfully analyzed asset ${asset.id} using Deepseek API`);
+          } else {
+            this.logger.warn('DEEPSEEK_API_KEY not configured, falling back to mock analysis');
+            analysisResult = this.getFallbackAnalysis(asset, template);
+          }
+        } catch (error: any) {
+          this.logger.error(`AI analysis failed: ${error.message}`, error.stack);
+          // Fallback to simplified analysis
+          analysisResult = this.getFallbackAnalysis(asset, template);
+        }
       }
-    } catch (error) {
-      this.logger.error(`AI analysis failed: ${error.message}`, error.stack);
-      // Fallback to simplified analysis
-      analysisResult = this.getFallbackAnalysis(asset, template);
     }
 
     // Update evaluation if provided
@@ -124,7 +161,7 @@ export class AiService {
             reportUrl: `${this.configService.get('FRONTEND_URL') || 'http://localhost:3001'}/evaluations/${dto.evaluationId}`,
           },
         });
-      } catch (error) {
+      } catch (error: any) {
         this.logger.warn(`Failed to send notification: ${error.message}`);
       }
     }
@@ -137,7 +174,8 @@ export class AiService {
     template: any,
     evaluation: any,
   ): Promise<AiAnalysisResponseDto> {
-    const systemPrompt = this.promptBuilder.buildSystemPrompt(
+    const systemPrompt = await this.promptBuilder.buildSystemPrompt(
+      asset.tenantId,
       {
         id: asset.id,
         name: asset.name,
@@ -183,6 +221,10 @@ export class AiService {
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
+          { 
+            role: 'user', 
+            content: 'IMPORTANT: Return ONLY the raw JSON. Do not use Markdown code blocks. Ensure valid JSON format.' 
+          }
         ],
         temperature: 0.7,
         max_tokens: 4000,
@@ -197,8 +239,13 @@ export class AiService {
       const parsed = this.parseAIResponse(content);
       
       // Convert to DTO format
-      return this.convertToResponseDto(parsed, asset, template);
-    } catch (error) {
+      const result = this.convertToResponseDto(parsed, asset, template);
+      
+      // Attach token usage info
+      (result as any).tokenUsage = response.data.usage?.total_tokens;
+
+      return result;
+    } catch (error: any) {
       if (axios.isAxiosError(error)) {
         this.logger.error(`Deepseek API error: ${error.response?.status} - ${error.response?.data?.error?.message || error.message}`);
         throw new Error(`Deepseek API error: ${error.response?.data?.error?.message || error.message}`);
@@ -208,17 +255,20 @@ export class AiService {
   }
 
   private parseAIResponse(content: string): ParsedAnalysis {
-    // Try to extract JSON from the response
-    // The AI might wrap JSON in markdown code blocks or add extra text
     let jsonStr = content.trim();
 
     // Remove markdown code blocks if present
-    jsonStr = jsonStr.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const markdownMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (markdownMatch) {
+      jsonStr = markdownMatch[1];
+    }
 
     // Try to find JSON object in the response
-    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[0];
+    const firstOpen = jsonStr.indexOf('{');
+    const lastClose = jsonStr.lastIndexOf('}');
+    
+    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+      jsonStr = jsonStr.substring(firstOpen, lastClose + 1);
     }
 
     try {
@@ -230,9 +280,10 @@ export class AiService {
       }
 
       return parsed as ParsedAnalysis;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to parse AI response: ${error.message}`);
-      this.logger.debug(`Response content: ${content.substring(0, 500)}`);
+      this.logger.debug(`Raw response content: ${content}`);
+      this.logger.debug(`Extracted JSON string: ${jsonStr}`);
       throw new Error(`Failed to parse AI response: ${error.message}`);
     }
   }

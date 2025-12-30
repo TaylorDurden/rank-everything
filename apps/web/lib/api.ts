@@ -17,6 +17,14 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
   });
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      // Only redirect if we're not already on the login page to avoid loops
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
+      }
+    }
+
     const error = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
     throw new Error(error.message || 'API request failed');
   }

@@ -18,6 +18,7 @@ async function bootstrap() {
     .addTag('templates')
     .addTag('ai')
     .addTag('reports')
+    .addTag('prompts')
     .addBearerAuth()
     .build();
   

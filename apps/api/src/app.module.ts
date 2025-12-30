@@ -11,6 +11,7 @@ import { AiModule } from './ai/ai.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuthModule } from './auth/auth.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PromptsModule } from './prompts/prompts.module';
 import { AppService } from './app.service';
 import { AppController } from './app.controller';
 import { APP_GUARD } from '@nestjs/core';
@@ -33,6 +34,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ReportsModule,
     AuthModule,
     NotificationsModule,
+    PromptsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -17,6 +17,12 @@ JWT_SECRET="your-secret-key-change-in-production"
 DEEPSEEK_API_KEY="your-deepseek-api-key"
 DEEPSEEK_API_URL="https://api.deepseek.com/v1/chat/completions"
 
+# AI Usage Control (Optional - defaults shown)
+AI_CACHE_TTL=86400000  # 24 hours in milliseconds
+AI_CACHE_MAX_SIZE=1000  # Maximum cache entries
+AI_DAILY_LIMIT=50  # Daily API calls per tenant
+AI_MONTHLY_LIMIT=1000  # Monthly API calls per tenant
+
 # Notifications (Optional)
 SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
 EMAIL_ENABLED=false
