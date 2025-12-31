@@ -29,9 +29,21 @@ export class PdfService {
   async generatePdfFromHtml(html: string, filename: string): Promise<string> {
     let browser;
     try {
+      let executablePath: string | undefined = undefined;
+      // Fallback for macOS system Chrome
+      if (process.platform === 'darwin') {
+         const systemChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+         try {
+             await fs.access(systemChrome);
+             executablePath = systemChrome;
+             this.logger.log(`Using system Chrome at ${executablePath}`);
+         } catch (e) {}
+      }
+
       browser = await puppeteer.launch({
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        executablePath,
       });
 
       const page = await browser.newPage();

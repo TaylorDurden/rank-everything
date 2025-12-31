@@ -35,6 +35,21 @@ interface ParsedAnalysis {
     owner_hint?: string;
     eta?: string;
   }>;
+  projections?: Array<{
+    scenario: string;
+    description: string;
+    outcome: string;
+    probability: string;
+  }>;
+  specific_recommendations?: Array<{
+    category: string;
+    items: string[];
+  }>;
+  comparison?: {
+    summary: string;
+    improvements: string[];
+    regressions: string[];
+  };
 }
 
 @Injectable()
@@ -65,7 +80,27 @@ export class AiService {
     });
   }
 
-  async analyzeAsset(dto: AiAnalysisRequestDto): Promise<AiAnalysisResponseDto> {
+  async analyzeAsset(dto: AiAnalysisRequestDto): Promise<any> {
+    if (dto.evaluationId) {
+      await this.prisma.evaluation.update({
+        where: { id: dto.evaluationId },
+        data: { status: 'processing', progress: 10 }
+      });
+
+      this.executeAnalysisLogic(dto).catch(async (err) => {
+        this.logger.error(`Background analysis failed: ${err.message}`, err.stack);
+        await this.prisma.evaluation.update({
+           where: { id: dto.evaluationId },
+           data: { status: 'failed', progress: 0 }
+        });
+      });
+
+      return { status: 'processing', message: 'Analysis started in background' };
+    }
+    return this.executeAnalysisLogic(dto);
+  }
+
+  private async executeAnalysisLogic(dto: AiAnalysisRequestDto): Promise<AiAnalysisResponseDto> {
     const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
     const template = await this.prisma.template.findUnique({ where: { id: dto.templateId } });
 
@@ -97,9 +132,18 @@ export class AiService {
         analysisResult = this.getFallbackAnalysis(asset, template);
       } else {
         try {
+          const previousEvaluation = await this.prisma.evaluation.findFirst({
+            where: { 
+                assetId: dto.assetId, 
+                id: dto.evaluationId ? { not: dto.evaluationId } : undefined,
+                status: 'completed'
+            },
+            orderBy: { createdAt: 'desc' }
+          });
+
           // Try to call Deepseek API
           if (this.apiKey) {
-            const result = await this.callDeepseekAPI(asset, template, evaluation);
+            const result = await this.callDeepseekAPI(asset, template, evaluation, previousEvaluation);
 
             // tokenUsage 是内部字段，不在公共 DTO 上暴露，这里通过 any 读取
             const tokenUsage = (result as any).tokenUsage as number | undefined;
@@ -137,11 +181,16 @@ export class AiService {
         data: {
           status: 'completed',
           progress: 100,
-          results: {
+            results: {
             scores: analysisResult.scores,
             rationales: analysisResult.rationales,
             suggestions: analysisResult.suggestions,
             reportMarkdown: analysisResult.reportMarkdown,
+            projections: analysisResult.projections,
+            specificRecommendations: analysisResult.specificRecommendations,
+            comparison: (analysisResult as any).comparison,
+            findings: (analysisResult as any).findings,
+            risks: (analysisResult as any).risks,
           } as any,
         },
         include: {
@@ -173,6 +222,7 @@ export class AiService {
     asset: any,
     template: any,
     evaluation: any,
+    previousEvaluation?: any,
   ): Promise<AiAnalysisResponseDto> {
     const systemPrompt = await this.promptBuilder.buildSystemPrompt(
       asset.tenantId,
@@ -213,6 +263,7 @@ export class AiService {
         assetType: template.assetType,
         dimensions: (template.dimensions as any) || [],
       },
+      previousEvaluation,
     );
 
     try {
@@ -317,7 +368,12 @@ export class AiService {
       rationales,
       suggestions,
       reportMarkdown,
-    };
+      projections: parsed.projections,
+      specificRecommendations: parsed.specific_recommendations,
+      comparison: parsed.comparison,
+      findings: parsed.findings,
+      risks: parsed.risks,
+    } as any;
   }
 
   private buildMarkdownReport(
@@ -335,6 +391,22 @@ export class AiService {
       .map((a, i) => `${i + 1}. **${a.title}**: ${a.why} (影响: ${a.impact}, 难度: ${a.effort})`)
       .join('\n');
 
+    const projectionsText = parsed.projections
+      ? `\n## 🔮 未来情景推演\n${parsed.projections
+          .map(p => `### ${p.scenario} (概率: ${p.probability})\n- **描述**: ${p.description}\n- **预计结果**: ${p.outcome}`)
+          .join('\n\n')}`
+      : '';
+
+    const recommendationsText = parsed.specific_recommendations
+      ? `\n## 🚀 具体建议\n${parsed.specific_recommendations
+          .map(rec => `### ${rec.category}\n${rec.items.map(i => `- ${i}`).join('\n')}`)
+          .join('\n\n')}`
+      : '';
+
+    const comparisonText = parsed.comparison && parsed.comparison.summary
+      ? `\n## 📈 历史对比分析\n${parsed.comparison.summary}\n\n**进步点**:\n${parsed.comparison.improvements.length ? parsed.comparison.improvements.map(i => `- ${i}`).join('\n') : '- 无显著进步'}\n\n**退步/关注点**:\n${parsed.comparison.regressions.length ? parsed.comparison.regressions.map(r => `- ${r}`).join('\n') : '- 无显著退步'}`
+      : '';
+
     return `# AI 分析报告: ${asset.name}
 
 ## 总体评分
@@ -349,8 +421,14 @@ ${findingsText}
 ## 潜在风险
 ${risksText}
 
+${projectionsText}
+
 ## 改进建议
 ${actionsText}
+
+${recommendationsText}
+
+${comparisonText}
 
 ---
 *基于 ${template.name} 模板生成 | 生成时间: ${new Date().toLocaleString('zh-CN')}*
@@ -399,5 +477,69 @@ ${suggestions.map((s) => `- ${s}`).join('\n')}
       suggestions,
       reportMarkdown,
     };
+  }
+
+  /**
+   * Refine and standardize context input
+   */
+  async refineContext(
+    tenantId: string,
+    description: string,
+    assetType: string,
+    templateName?: string
+  ): Promise<{ refinedContext: string; questions: string[] }> {
+      const expertRole = 'You are a professional consultant helping a user prepare information for an AI evaluation system.';
+      
+      const systemPrompt = `${expertRole}
+The user is preparing to evaluate a "${assetType}"${templateName ? ` using the "${templateName}" template` : ''}.
+Your goal is to:
+1. Re-write the user's description to be professional, structured, and comprehensive.
+2. Identify 3-5 key pieces of missing information that would be critical for a high-quality evaluation.
+
+Return ONLY a JSON object with this format:
+{
+  "refined_context": "<rewritten structured text>",
+  "questions": ["<question 1>", "<question 2>", ...]
+}`;
+
+      const userMessage = `User's current input:
+"${description}"
+
+Please refine this input and list missing information.`;
+
+      try {
+        const response = await this.httpClient.post<DeepseekResponse>('', {
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage },
+              { role: 'user', content: 'Return valid JSON only.' }
+            ],
+            temperature: 0.7,
+        });
+
+        const content = response.data.choices[0]?.message?.content;
+        if (!content) return { refinedContext: description, questions: [] };
+
+        let jsonStr = content.trim();
+        const markdownMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (markdownMatch) jsonStr = markdownMatch[1];
+        
+        const firstOpen = jsonStr.indexOf('{');
+        const lastClose = jsonStr.lastIndexOf('}');
+        if (firstOpen !== -1 && lastClose !== -1) {
+            jsonStr = jsonStr.substring(firstOpen, lastClose + 1);
+        }
+
+        const parsed = JSON.parse(jsonStr);
+        return {
+            refinedContext: parsed.refined_context || description,
+            questions: parsed.questions || []
+        };
+      } catch (error) {
+          this.logger.error('Failed to refine context', error);
+          // Fallback
+          return { refinedContext: description, questions: [] };
+      }
   }
 }

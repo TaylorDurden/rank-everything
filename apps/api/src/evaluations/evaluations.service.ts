@@ -26,13 +26,19 @@ export class EvaluationsService {
     });
   }
 
-  async findAll(tenantId: string) {
+  async findAll(tenantId: string, assetId?: string) {
     return this.prisma.evaluation.findMany({
-      where: { tenantId },
+      where: { 
+        tenantId,
+        ...(assetId ? { assetId } : {})
+      },
       include: {
         asset: true,
         template: true,
       },
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
   }
 

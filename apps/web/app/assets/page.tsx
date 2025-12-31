@@ -9,7 +9,8 @@ import {
   Tag as TagIcon,
   Loader2,
   RefreshCw,
-  Trash2
+  Trash2,
+  Pencil
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '../../lib/api';
@@ -40,6 +41,7 @@ export default function AssetsPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [newAsset, setNewAsset] = useState({
     name: '',
     type: 'Digital',
@@ -69,11 +71,27 @@ export default function AssetsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assets'] });
       setIsModalOpen(false);
-      setNewAsset({ name: '', type: 'Digital', description: '', status: 'active', metadata: {} });
+      resetForm();
       toast.success('Asset created successfully');
     },
     onError: (err: any) => {
       toast.error(`Failed to create asset: ${err.message}`);
+    }
+  });
+
+  const updateAsset = useMutation({
+    mutationFn: (data: typeof newAsset) => apiFetch(`/assets/${selectedAssetId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assets'] });
+      setIsModalOpen(false);
+      resetForm();
+      toast.success('Asset updated successfully');
+    },
+    onError: (err: any) => {
+      toast.error(`Failed to update asset: ${err.message}`);
     }
   });
 
@@ -94,6 +112,29 @@ export default function AssetsPage() {
     }
   });
 
+  const resetForm = () => {
+      setNewAsset({ name: '', type: 'Digital', description: '', status: 'active', metadata: {} });
+      setSelectedAssetId(null);
+  };
+
+  const handleCreateOpen = () => {
+      resetForm();
+      setIsModalOpen(true);
+  };
+
+  const handleEditOpen = (asset: any, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setNewAsset({
+          name: asset.name,
+          type: asset.type,
+          description: asset.description || '',
+          status: asset.status,
+          metadata: asset.metadata || {}
+      });
+      setSelectedAssetId(asset.id);
+      setIsModalOpen(true);
+  };
+
   const confirmDelete = (id: string) => {
     setAssetToDeleteId(id);
     setOpenDeleteDialog(true);
@@ -107,7 +148,11 @@ export default function AssetsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createAsset.mutate(newAsset);
+    if (selectedAssetId) {
+        updateAsset.mutate(newAsset);
+    } else {
+        createAsset.mutate(newAsset);
+    }
   };
 
   const filteredAssets = assets.filter((asset: any) => 
@@ -135,16 +180,19 @@ export default function AssetsPage() {
             <RefreshCw className="h-4 w-4" />
           </Button>
           
-          <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <Dialog open={isModalOpen} onOpenChange={(open) => {
+              setIsModalOpen(open);
+              if (!open) resetForm();
+          }}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-blue-900/20">
+              <Button onClick={handleCreateOpen} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-blue-900/20">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Asset
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] bg-slate-900 border-white/10">
               <DialogHeader>
-                <DialogTitle className="text-white">New Asset Registration</DialogTitle>
+                <DialogTitle className="text-white">{selectedAssetId ? 'Edit Asset' : 'New Asset Registration'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                 <div className="space-y-2">
@@ -191,10 +239,10 @@ export default function AssetsPage() {
                 <div className="pt-4">
                   <Button
                     type="submit"
-                    disabled={createAsset.isPending}
+                    disabled={createAsset.isPending || updateAsset.isPending}
                     className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-6 rounded-xl shadow-xl shadow-blue-500/20"
                   >
-                    {createAsset.isPending ? 'Syncing with Registry...' : 'Initialize Asset'}
+                    {createAsset.isPending || updateAsset.isPending ? 'Syncing...' : selectedAssetId ? 'Update Asset' : 'Initialize Asset'}
                   </Button>
                 </div>
               </form>
@@ -304,6 +352,14 @@ export default function AssetsPage() {
                     </TableCell>
                     <TableCell className="px-8 py-5 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                        <Button
+                           variant="ghost"
+                           size="icon"
+                           onClick={(e) => handleEditOpen(asset, e)}
+                           className="h-8 w-8 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"
+                        >
+                            <Pencil className="h-4 w-4" />
+                         </Button>
                         <AlertDialog open={openDeleteDialog} onOpenChange={setOpenDeleteDialog}>
                           <AlertDialogTrigger asChild>
                             <Button

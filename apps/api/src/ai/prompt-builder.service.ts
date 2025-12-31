@@ -123,6 +123,8 @@ ${dimensionsText}
 3. 识别3-7个关键发现
 4. 识别不超过3个潜在风险
 5. 提供可执行的改进建议（不超过8条）
+6. 进行未来情景推演（projections），包含基准、乐观和风险三种情景
+7. 提供基于上下文的具象化建议（specific_recommendations），例如针对职业提供具体的副业方向或学习路径
 
 ## 输出格式要求
 你必须以JSON格式输出，包含以下字段：
@@ -154,7 +156,28 @@ ${dimensionsText}
       "owner_hint": "<建议负责人>",
       "eta": "<预计完成时间>"
     }
-  ]
+  ],
+  "projections": [
+    {
+      "scenario": "Baseline|Optimistic|Pessimistic",
+      "description": "<情景描述>",
+      "outcome": "<预计结果>",
+      "probability": "<可能性: Low/Medium/High>"
+    }
+  ],
+  "specific_recommendations": [
+    {
+      "category": "<分类名称>",
+      "items": [
+        "<具体建议条目>"
+      ]
+    }
+  ],
+  "comparison": {
+    "summary": "<与上次评估的对比总结（如果有历史数据）>",
+    "improvements": ["<改进点1>", "<改进点2>"],
+    "regressions": ["<退步点1>", "<退步点2>"]
+  }
 }
 
 ## 质量守则
@@ -162,6 +185,7 @@ ${dimensionsText}
 - 所有字段必须齐全
 - 评分理由要具体、可溯源
 - 建议要可执行、有时效性
+- 情景推演要基于逻辑和数据
 - 如果数据不足，请说明并给出数据收集建议
 
 请开始分析，直接输出JSON，不要包含其他文字。`;
@@ -170,12 +194,30 @@ ${dimensionsText}
   /**
    * 构建用户消息（包含资产元数据等额外信息）
    */
-  buildUserMessage(asset: AssetContext, template: TemplateContext): string {
+  buildUserMessage(
+    asset: AssetContext, 
+    template: TemplateContext,
+    previousResults?: any
+  ): string {
     const metadataText = asset.metadata && Object.keys(asset.metadata).length > 0
       ? `\n## 资产元数据\n${JSON.stringify(asset.metadata, null, 2)}`
       : '';
 
-    return `请对以下资产进行评估：${metadataText}`;
+    let message = `请对以下资产进行评估：${metadataText}`;
+
+    if (previousResults) {
+        // Extract relevant historical data for context
+        const historyContext = {
+            date: previousResults.createdAt,
+            scores: previousResults.results?.scores,
+            findings: previousResults.results?.findings, // If we saved them? Currently findings are in markdown only or not structured in DTO. 
+            // AiAnalysisResponseDto structured fields: rationales, suggestions...
+            // Let's pass what we have.
+        };
+        message += `\n\n## 历史评估参考 (用于生成趋势分析和进步对比)\n上一次评估数据: ${JSON.stringify(historyContext, null, 2)}`;
+    }
+
+    return message;
   }
 }
 

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch, Delete, Headers, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Delete, Headers, UseGuards, Query } from '@nestjs/common';
 import { GetUser } from '../auth/decorators/user.decorator';
 import { ApiTags, ApiHeader, ApiBearerAuth } from '@nestjs/swagger';
 import { EvaluationsService } from './evaluations.service';
@@ -27,8 +27,11 @@ export class EvaluationsController {
   }
 
   @Get()
-  findAll(@GetUser('tenantId') tenantId: string) {
-    return this.evaluationsService.findAll(tenantId);
+  findAll(
+    @GetUser('tenantId') tenantId: string,
+    @Query('assetId') assetId?: string
+  ) {
+    return this.evaluationsService.findAll(tenantId, assetId);
   }
 
   @Get(':id')

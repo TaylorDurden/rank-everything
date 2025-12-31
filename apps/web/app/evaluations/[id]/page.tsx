@@ -17,7 +17,13 @@ import {
   Zap,
   BarChart3,
   Loader2,
-  Download
+  Download,
+  Minus,
+  TrendingDown,
+  Lightbulb,
+  Layers,
+  ArrowRight,
+  Clock
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
@@ -104,6 +110,10 @@ export default function EvaluationDetailsPage() {
     queryKey: ['evaluation', id],
     queryFn: () => apiFetch<any>(`/evaluations/${id}`),
     enabled: !!id,
+    refetchInterval: (query) => {
+        const data = query.state.data;
+        return (data?.status === 'processing' || data?.status === 'draft') ? 2000 : false;
+    }
   });
 
   const runAnalysis = useMutation({
@@ -118,7 +128,7 @@ export default function EvaluationDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['evaluation', id] });
       queryClient.invalidateQueries({ queryKey: ['report', id] });
-      toast.success('AI Analysis synchronized successfully.');
+      toast.info('AI is analyzing... You can leave this page, the report will be ready shortly.');
     },
     onError: (err: any) => {
       toast.error(`Analysis failure: ${err.message}`);
@@ -129,6 +139,12 @@ export default function EvaluationDetailsPage() {
     queryKey: ['report', id],
     queryFn: () => apiFetch<any>(`/reports/${id}`),
     enabled: !!id && evaluation?.status === 'completed',
+  });
+
+  const { data: historyEvaluations } = useQuery({
+    queryKey: ['evaluations', 'history', evaluation?.assetId],
+    queryFn: () => apiFetch<any[]>(`/evaluations?assetId=${evaluation?.assetId}`),
+    enabled: !!evaluation?.assetId,
   });
 
   // Calculate or extract Overall Score
@@ -417,7 +433,7 @@ export default function EvaluationDetailsPage() {
 
                {/* Risks */}
                <div className="p-8 bg-white/5 border border-red-500/20 rounded-[2.5rem] space-y-6 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-5"><ShieldCheck className="w-32 h-32" /></div>
+                   <div className="absolute top-0 right-0 p-4 opacity-5"><ShieldCheck className="w-32 h-32" /></div>
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <Activity className="w-5 h-5 text-red-400" />
                     Risk Assessment
@@ -431,6 +447,140 @@ export default function EvaluationDetailsPage() {
                     ))}
                   </ul>
                </div>
+            </div>
+          )}
+
+          {/* Historical Comparison */}
+          {report?.results?.comparison && (
+             <div className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] space-y-6">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <History className="w-5 h-5 text-cyan-400" />
+                    Historical Comparison
+                </h3>
+                <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <p className="text-sm text-slate-300 leading-relaxed italic border-l-2 border-cyan-400 pl-4 py-1">
+                        {report.results.comparison.summary}
+                    </p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                        <h4 className="flex items-center gap-2 font-bold text-emerald-400 text-sm uppercase tracking-wider">
+                            <TrendingUp className="w-4 h-4" /> Improvements
+                        </h4>
+                        {report.results.comparison.improvements?.length > 0 ? (
+                             <ul className="space-y-3">
+                                {report.results.comparison.improvements.map((item: string, i: number) => (
+                                    <li key={i} className="text-sm text-slate-400 flex items-start gap-3">
+                                         <div className="min-w-1.5 h-1.5 mt-2 rounded-full bg-emerald-500" />
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                             </ul>
+                        ) : (
+                            <p className="text-xs text-slate-600 italic">No significant improvements detected.</p>
+                        )}
+                    </div>
+                    
+                    <div className="space-y-4">
+                        <h4 className="flex items-center gap-2 font-bold text-red-400 text-sm uppercase tracking-wider">
+                            <TrendingDown className="w-4 h-4" /> Regressions / Attention Points
+                        </h4>
+                        {report.results.comparison.regressions?.length > 0 ? (
+                             <ul className="space-y-3">
+                                {report.results.comparison.regressions.map((item: string, i: number) => (
+                                    <li key={i} className="text-sm text-slate-400 flex items-start gap-3">
+                                         <div className="min-w-1.5 h-1.5 mt-2 rounded-full bg-red-500" />
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                             </ul>
+                        ) : (
+                            <p className="text-xs text-slate-600 italic">No regressions detected.</p>
+                        )}
+                    </div>
+                </div>
+             </div>
+          )}
+
+          {/* New: Future Scenarios (Projections) */}
+          {report?.results?.projections && report.results.projections.length > 0 && (
+             <div className="space-y-6">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-purple-400" />
+                    Future Scenarios Projection
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {report.results.projections.map((proj: any, i: number) => {
+                        const isOptimistic = proj.scenario?.toLowerCase().includes('optimistic') || proj.scenario?.includes('乐观');
+                        const isPessimistic = proj.scenario?.toLowerCase().includes('pessimistic') || proj.scenario?.includes('risk') || proj.scenario?.includes('风险') || proj.scenario?.includes('保守');
+                        const isBaseline = !isOptimistic && !isPessimistic;
+
+                        return (
+                            <div key={i} className={clsx(
+                                "p-6 rounded-3xl border flex flex-col gap-4 relative overflow-hidden group transition-all hover:-translate-y-1",
+                                isOptimistic ? "bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10" :
+                                isPessimistic ? "bg-red-500/5 border-red-500/20 hover:bg-red-500/10" :
+                                "bg-blue-500/5 border-blue-500/20 hover:bg-blue-500/10"
+                            )}>
+                                <div className="flex justify-between items-center">
+                                    <div className={clsx(
+                                        "p-2 rounded-xl",
+                                        isOptimistic ? "bg-emerald-500/20 text-emerald-400" :
+                                        isPessimistic ? "bg-red-500/20 text-red-400" :
+                                        "bg-blue-500/20 text-blue-400"
+                                    )}>
+                                        {isOptimistic ? <TrendingUp className="w-5 h-5" /> : 
+                                         isPessimistic ? <TrendingDown className="w-5 h-5" /> : 
+                                         <Activity className="w-5 h-5" />}
+                                    </div>
+                                    <span className="text-[10px] uppercase tracking-widest font-bold text-slate-500">
+                                        Prob: {proj.probability}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 className={clsx("font-bold text-lg mb-1", 
+                                        isOptimistic ? "text-emerald-400" : 
+                                        isPessimistic ? "text-red-400" : 
+                                        "text-blue-400"
+                                    )}>{proj.scenario}</h4>
+                                    <p className="text-xs text-slate-400 leading-relaxed">{proj.description}</p>
+                                </div>
+                                <div className="mt-auto pt-4 border-t border-white/5">
+                                    <p className="text-sm font-medium text-white">{proj.outcome}</p>
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+             </div>
+          )}
+
+          {/* New: Specific Recommendations (Categorized) */}
+          {report?.results?.specificRecommendations && report.results.specificRecommendations.length > 0 && (
+            <div className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem] space-y-8">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Lightbulb className="w-5 h-5 text-yellow-400" />
+                    Targeted Advice
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {report.results.specificRecommendations.map((cat: any, i: number) => (
+                        <div key={i} className="space-y-4">
+                            <h4 className="flex items-center gap-2 font-bold text-slate-300 border-b border-white/5 pb-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                                {cat.category}
+                            </h4>
+                            <ul className="space-y-3">
+                                {cat.items.map((item: string, j: number) => (
+                                    <li key={j} className="text-sm text-slate-400 flex items-start gap-3 bg-black/20 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
+                                        <ArrowRight className="w-4 h-4 text-blue-500/50 mt-0.5 shrink-0" />
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
+                </div>
             </div>
           )}
           
@@ -508,13 +658,44 @@ export default function EvaluationDetailsPage() {
             </p>
             <button 
               onClick={() => runAnalysis.mutate()}
-              disabled={runAnalysis.isPending || evaluation.status === 'completed'}
+              disabled={runAnalysis.isPending || evaluation.status === 'completed' || evaluation.status === 'processing'}
               className="mt-6 text-sm font-bold text-blue-400 flex items-center gap-1 hover:gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {runAnalysis.isPending ? 'Synchronizing Intelligence...' : evaluation.status === 'completed' ? 'Analysis synchronized' : 'Request Full Analysis'} 
-              {!runAnalysis.isPending && evaluation.status !== 'completed' && <ArrowUpRight className="w-4 h-4" />}
+              {runAnalysis.isPending || evaluation.status === 'processing' ? 'Synchronizing Intelligence...' : evaluation.status === 'completed' ? 'Analysis synchronized' : 'Request Full Analysis'} 
             </button>
           </div>
+
+          {/* History List */}
+          {historyEvaluations && historyEvaluations.length > 1 && (
+             <div className="p-8 bg-white/5 border border-white/10 rounded-[2.5rem]">
+               <h4 className="font-bold text-white mb-6 uppercase text-xs tracking-widest flex items-center gap-2">
+                 <Clock className="w-4 h-4 text-slate-400" />
+                 Evaluation History
+               </h4>
+               <div className="space-y-4">
+                 {historyEvaluations.map((hist: any) => (
+                   <Link 
+                     href={`/evaluations/${hist.id}`} 
+                     key={hist.id}
+                     className={clsx(
+                       "flex items-center justify-between p-3 rounded-xl border transition-all hover:bg-white/5",
+                       hist.id === id ? "bg-blue-500/10 border-blue-500/20" : "bg-transparent border-transparent"
+                     )}
+                   >
+                     <div className="flex flex-col">
+                        <span className={clsx("text-xs font-bold", hist.id === id ? "text-blue-400" : "text-slate-300")}>
+                          {new Date(hist.createdAt).toLocaleDateString()}
+                        </span>
+                        <span className="text-[10px] text-slate-500 uppercase">{hist.status}</span>
+                     </div>
+                     {hist.id === id && (
+                         <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
+                     )}
+                   </Link>
+                 ))}
+               </div>
+             </div>
+          )}
         </div>
       </div>
     </div>

@@ -10,4 +10,14 @@ export interface AiAnalysisResponseDto {
   rationales: Record<string, string>;
   suggestions: string[];
   reportMarkdown: string;
+  projections?: Array<{
+    scenario: string;
+    description: string;
+    outcome: string;
+    probability: string;
+  }>;
+  specificRecommendations?: Array<{
+    category: string;
+    items: string[];
+  }>;
 }
